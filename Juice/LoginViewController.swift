@@ -14,6 +14,9 @@ class LoginViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Since Apple sign-in is only available for iOS 13+
+        // we have to check for availability
+        // before present the option
         setupProviderLoginView()
     }
     
@@ -22,7 +25,7 @@ class LoginViewController: UIViewController {
         performExistingAccountSetupFlows()
     }
     
-    /// - Tag: add_appleid_button
+    
     func setupProviderLoginView() {
         let authorizationButton = ASAuthorizationAppleIDButton()
         authorizationButton.addTarget(self, action: #selector(handleAuthorizationAppleIDButtonPress), for: .touchUpInside)
@@ -58,15 +61,36 @@ class LoginViewController: UIViewController {
 }
 
 extension LoginViewController: ASAuthorizationControllerDelegate {
-    /// - Tag: did_complete_authorization
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
         switch authorization.credential {
         case let appleIDCredential as ASAuthorizationAppleIDCredential:
             
-            // Create an account in your system.
+            /////////////////////////////////////////////////////////////////
+            // This is the core step to retrieve the required data to
+            // perform the user authentication
+            /////////////////////////////////////////////////////////////////
             let userIdentifier = appleIDCredential.user
-            let fullName = appleIDCredential.fullName
             let email = appleIDCredential.email
+            
+            guard
+                let fullName = appleIDCredential.fullName,
+                let idTokenData = appleIDCredential.identityToken,
+                let idToken = String(data: idTokenData, encoding: .utf8),
+                let authorizationCodeData = appleIDCredential.authorizationCode,
+                let authorizationCode = String(data: authorizationCodeData, encoding: .utf8)
+            else {
+                debugPrint("Error: Can't retrieve all required fields")
+                break
+            }
+            
+            /////////////////////////////////////////////////////////////////
+            // The required fields to send to backEnd:
+            // idToken, authorizationCode, userName
+            //TODO: - Send request to backEnd
+            // LoginRepository.login(token: idToken, appleAuthorizationCode: authorizationCode, appleUserName: userName)
+            /////////////////////////////////////////////////////////////////
             
             // For the purpose of this demo app, store the `userIdentifier` in the keychain.
             self.saveUserInKeychain(userIdentifier)
@@ -133,7 +157,7 @@ extension LoginViewController: ASAuthorizationControllerDelegate {
 }
 
 extension LoginViewController: ASAuthorizationControllerPresentationContextProviding {
-    /// - Tag: provide_presentation_anchor
+    
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         return self.view.window!
     }
